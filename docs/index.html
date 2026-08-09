@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>小書轉換器 — docx 轉小書格式 PDF</title>
+<title>小書轉換器 — docx / PDF 轉小書格式 PDF</title>
 <link rel="stylesheet" href="style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -14,17 +14,21 @@
 <body>
 <header>
   <h1>📖 小書轉換器</h1>
-  <p class="subtitle">上傳排好版的 .docx（一頁一圖一文），自動輸出可對摺裝訂的小書格式 PDF — 全部在您的瀏覽器內完成，檔案不會上傳到任何伺服器。</p>
+  <p class="subtitle">上傳排好版的 .docx，或已經排好版的 .pdf（一頁一圖一文），自動輸出可對摺裝訂的小書格式 PDF — 全部在您的瀏覽器內完成，檔案不會上傳到任何伺服器。</p>
 </header>
 
 <main>
   <section id="upload-section" class="card">
     <div id="dropzone" class="dropzone">
-      <p>拖曳 .docx 檔案到這裡，或</p>
+      <p>拖曳 .docx 或 .pdf 檔案到這裡，或</p>
       <label class="btn">
         選擇檔案
-        <input type="file" id="fileInput" accept=".docx" hidden>
+        <input type="file" id="fileInput" accept=".docx,.pdf" hidden>
       </label>
+      <p class="hint-inline">
+        .docx：需要自動判斷分頁位置（可能需手動微調）。<br>
+        .pdf：檔案裡每一頁就是最終書的一頁，不需要判斷分頁，直接排版、品質更高。
+      </p>
       <p id="fileName" class="filename"></p>
     </div>
   </section>
@@ -78,6 +82,7 @@
 <script src="js/paginate.js"></script>
 <script src="js/renderPage.js"></script>
 <script src="js/pdfBuilder.js"></script>
+<script src="js/pdfImposer.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

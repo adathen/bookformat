@@ -87,12 +87,21 @@
   }
 
   async function handleFile(file) {
-    if (!file || !file.name.toLowerCase().endsWith(".docx")) {
-      showError("請選擇 .docx 檔案。");
+    const name = file && file.name.toLowerCase();
+    if (!file || (!name.endsWith(".docx") && !name.endsWith(".pdf"))) {
+      showError("請選擇 .docx 或 .pdf 檔案。");
       return;
     }
-    state.baseName = file.name.replace(/\.docx$/i, "");
     fileNameEl.textContent = file.name;
+    if (name.endsWith(".pdf")) {
+      await handlePdfFile(file);
+    } else {
+      await handleDocxFile(file);
+    }
+  }
+
+  async function handleDocxFile(file) {
+    state.baseName = file.name.replace(/\.docx$/i, "");
     showOnly(statusSection);
     setStatus("正在讀取檔案...", 5);
 
@@ -113,6 +122,26 @@
     } catch (err) {
       console.error(err);
       showError("讀取 docx 時發生錯誤：" + (err && err.message ? err.message : err));
+    }
+  }
+
+  async function handlePdfFile(file) {
+    state.baseName = file.name.replace(/\.pdf$/i, "");
+    showOnly(statusSection);
+    setStatus("正在讀取檔案...", 5);
+
+    try {
+      const buf = await file.arrayBuffer();
+      const { bytes, pageCount } = await PdfImposer.imposeFlatPdfBytes(buf, setStatus);
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      downloadLink.href = url;
+      downloadLink.download = `${state.baseName}(小書格式).pdf`;
+      resultText.textContent = `偵測到原始 PDF 共 ${pageCount} 頁，已直接依原始頁面排版為適合對摺裝訂的小書格式 PDF（未經過重新繪製，保留原始畫質）。`;
+      showOnly(resultSection);
+    } catch (err) {
+      console.error(err);
+      showError("處理 PDF 時發生錯誤：" + (err && err.message ? err.message : err));
     }
   }
 

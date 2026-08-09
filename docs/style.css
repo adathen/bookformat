@@ -50,6 +50,7 @@ main {
 .dropzone.dragover { border-color: var(--accent); background: #f0f7f3; }
 
 .filename { margin-top: 12px; font-weight: 500; color: var(--accent-dark); word-break: break-all; }
+.hint-inline { margin-top: 14px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
 
 .btn {
   display: inline-block;
