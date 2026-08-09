@@ -108,15 +108,20 @@
     try {
       const buf = await file.arrayBuffer();
       setStatus("正在解析 docx 內容...", 15);
-      const { blocks, hasExplicitBreaks } = await DocxParser.parseDocx(buf, (done, total) => {
+      const { blocks, hasExplicitBreaks, pageGeometry } = await DocxParser.parseDocx(buf, (done, total) => {
         setStatus(`正在解析 docx 內容...（${done}/${total}）`, 15 + Math.round((done / total) * 20));
       });
       if (blocks.length === 0) {
         showError("這份文件沒有偵測到任何內容（文字或圖片），請確認檔案是否正確。");
         return;
       }
+      RenderPage.configure(pageGeometry);
       state.blocks = blocks;
-      state.breakBefore = Paginate.computeInitialBreaks(blocks, hasExplicitBreaks);
+      setStatus(
+        hasExplicitBreaks ? "偵測到手動分頁點，套用中..." : "正在依實際版面測量分頁位置...",
+        40
+      );
+      state.breakBefore = await Paginate.computeInitialBreaks(blocks, hasExplicitBreaks);
       renderEditor();
       showOnly(editorSection);
     } catch (err) {

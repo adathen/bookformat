@@ -8,20 +8,6 @@
  *    uploads, so there is exactly one imposition implementation.
  */
 const PdfBuilder = (() => {
-  function waitForImages(node) {
-    const imgs = Array.from(node.querySelectorAll("img"));
-    return Promise.all(
-      imgs.map((img) =>
-        img.complete && img.naturalWidth > 0
-          ? Promise.resolve()
-          : new Promise((res) => {
-              img.onload = res;
-              img.onerror = res;
-            })
-      )
-    );
-  }
-
   async function renderPagesToJpegBytes(pages, statusCb) {
     const stage = document.getElementById("renderStage");
     stage.innerHTML = "";
@@ -32,7 +18,7 @@ const PdfBuilder = (() => {
       statusCb(`正在繪製第 ${i + 1}/${pages.length} 頁...`, Math.round((i / pages.length) * 45));
       const node = RenderPage.buildPageNode(pages[i]);
       stage.appendChild(node);
-      await waitForImages(node);
+      await RenderPage.waitForImages(node);
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
       const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.85));

@@ -4,9 +4,14 @@
  *   { type:'paragraph', runs:[{text,bold,italic,sizePt}], align, pageBreakBefore }
  *   { type:'table', rows:[[cellText,...],...], pageBreakBefore }
  *
- * Also reports hasExplicitBreaks: true if the document contains any
- * real Word page-break markers (Ctrl+Enter or "page break before"
- * paragraph setting), so the paginator can trust them fully.
+ * Also reports:
+ *   hasExplicitBreaks - true if the document contains any real Word
+ *     page-break markers (Ctrl+Enter or "page break before" paragraph
+ *     setting), so the paginator can trust them fully.
+ *   pageGeometry - the document's actual page size/margins (from
+ *     w:pgSz/w:pgMar, converted from twips to CSS px), so on-screen
+ *     rendering and real-layout page-break measurement use the same
+ *     page dimensions Word itself would.
  */
 const DocxParser = (() => {
   const NS = {
@@ -125,6 +130,43 @@ const DocxParser = (() => {
     return { type: "table", rows, pageBreakBefore };
   }
 
+  // Word stores page size/margins in twips (1/1440 inch). Convert to CSS px
+  // at 96dpi so the on-screen render and the real-layout page-break
+  // measurement both use the document's actual page geometry instead of an
+  // arbitrary guess.
+  const TWIP_TO_PX = 96 / 1440;
+  const DEFAULT_GEOMETRY = {
+    pageWpx: 794,
+    pageHpx: 1123,
+    marginTopPx: 76,
+    marginRightPx: 76,
+    marginBottomPx: 76,
+    marginLeftPx: 76,
+  };
+
+  function extractPageGeometry(doc) {
+    const pgSz = doc.getElementsByTagName("w:pgSz")[0];
+    const pgMar = doc.getElementsByTagName("w:pgMar")[0];
+    const geometry = { ...DEFAULT_GEOMETRY };
+    if (pgSz) {
+      const w = parseInt(pgSz.getAttribute("w:w"), 10);
+      const h = parseInt(pgSz.getAttribute("w:h"), 10);
+      if (!isNaN(w)) geometry.pageWpx = Math.round(w * TWIP_TO_PX);
+      if (!isNaN(h)) geometry.pageHpx = Math.round(h * TWIP_TO_PX);
+    }
+    if (pgMar) {
+      const top = parseInt(pgMar.getAttribute("w:top"), 10);
+      const right = parseInt(pgMar.getAttribute("w:right"), 10);
+      const bottom = parseInt(pgMar.getAttribute("w:bottom"), 10);
+      const left = parseInt(pgMar.getAttribute("w:left"), 10);
+      if (!isNaN(top)) geometry.marginTopPx = Math.round(top * TWIP_TO_PX);
+      if (!isNaN(right)) geometry.marginRightPx = Math.round(right * TWIP_TO_PX);
+      if (!isNaN(bottom)) geometry.marginBottomPx = Math.round(bottom * TWIP_TO_PX);
+      if (!isNaN(left)) geometry.marginLeftPx = Math.round(left * TWIP_TO_PX);
+    }
+    return geometry;
+  }
+
   async function parseDocx(arrayBuffer, onProgress) {
     const zip = await JSZip.loadAsync(arrayBuffer);
 
@@ -139,6 +181,7 @@ const DocxParser = (() => {
     const doc = new DOMParser().parseFromString(docXmlText, "application/xml");
     const body = doc.getElementsByTagName("w:body")[0];
     if (!body) throw new Error("找不到文件內容（word/body），檔案可能已損毀。");
+    const pageGeometry = extractPageGeometry(doc);
 
     const blocks = [];
     let hasExplicitBreaks = false;
@@ -190,7 +233,7 @@ const DocxParser = (() => {
       }
     }
 
-    return { blocks, hasExplicitBreaks };
+    return { blocks, hasExplicitBreaks, pageGeometry };
   }
 
   return { parseDocx };
