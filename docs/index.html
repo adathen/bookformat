@@ -45,10 +45,10 @@
     <div class="editor-header">
       <h2>確認分頁</h2>
       <p class="hint">
-        本工具會自動偵測分頁位置。若原始 docx 有手動分頁點，會 100% 依照分頁點；
-        若沒有，程式會用瀏覽器實際版面（跟這份文件相同的頁面尺寸／邊界）真實測量每段內容的高度來推算分頁，
-        <strong>但字型細節跟 Word 仍有差異，分頁位置可能不完全一樣</strong>，請在下方確認／調整後再產生 PDF。
-        點一下頁面之間的分隔線可以切換「是否分頁」。
+        這份文件裡沒有可用的分頁資訊，所以分頁位置是<strong>依實際版面測量推算</strong>的，
+        可能跟原始 Word 不完全一樣，請在下方確認／調整後再產生 PDF。
+        點一下頁面之間的分隔線可以切換「是否分頁」。<br>
+        （一般由 Word 存檔的 docx 都會帶有分頁資訊，會自動採用、不需要這個步驟。）
       </p>
       <p class="page-count">目前共 <span id="pageCount">0</span> 頁（會自動補空白頁至 4 的倍數）</p>
     </div>
@@ -62,6 +62,7 @@
     <h2>完成！</h2>
     <p id="resultText"></p>
     <a id="downloadLink" class="btn primary" download>下載小書格式 PDF</a>
+    <button id="adjustBtn" class="btn" hidden>手動調整分頁</button>
     <button id="restartBtn" class="btn">重新上傳另一份檔案</button>
   </section>
 

@@ -2,16 +2,20 @@
  * Decides where page boundaries fall in a flat blocks[] array, producing
  * a boolean breakBefore[] (breakBefore[0] is always true).
  *
- * If the docx has explicit page-break markers, those are used exclusively
- * (100% reliable — matches Word exactly). Otherwise, this renders the
- * whole document as one continuous flow (RenderPage.buildFlowNode, using
- * the document's real page width/margins) and measures, with the actual
- * browser layout engine, how tall each block renders — then walks that
- * measured flow and cuts a page wherever the next block would overflow
- * the document's real page content height. This is a genuine layout
- * measurement, not a character-count guess, but it still won't be
- * byte-identical to Word (different font metrics/line-breaking rules),
- * so it's meant to be corrected by the user in the page-break editor.
+ * If the docx carries page-break markers — either real manual breaks or
+ * Word's own <w:lastRenderedPageBreak/> record of its last layout — those
+ * are used exclusively and reproduce Word's pagination exactly.
+ *
+ * Only when a document has neither (e.g. produced by a tool that never
+ * laid it out) does this fall back to measuring: it renders the whole
+ * document as one continuous flow (RenderPage.buildFlowNode, using the
+ * document's real page width/margins) and measures, with the actual
+ * browser layout engine, how tall each block renders, cutting a page
+ * wherever content would overflow the real page height. That is a
+ * genuine layout measurement rather than a character-count guess, but it
+ * cannot match Word exactly (the document's real fonts are usually not
+ * available in the browser), so it is meant to be corrected by the user
+ * in the page-break editor.
  */
 const Paginate = (() => {
   async function measureBreaks(blocks) {
@@ -45,7 +49,7 @@ const Paginate = (() => {
     return breakBefore;
   }
 
-  function breaksFromExplicitMarkers(blocks) {
+  function breaksFromMarkers(blocks) {
     const n = blocks.length;
     const breakBefore = new Array(n).fill(false);
     if (n === 0) return breakBefore;
@@ -56,9 +60,9 @@ const Paginate = (() => {
     return breakBefore;
   }
 
-  async function computeInitialBreaks(blocks, hasExplicitBreaks) {
+  async function computeInitialBreaks(blocks, useMarkers) {
     if (blocks.length === 0) return [];
-    return hasExplicitBreaks ? breaksFromExplicitMarkers(blocks) : await measureBreaks(blocks);
+    return useMarkers ? breaksFromMarkers(blocks) : await measureBreaks(blocks);
   }
 
   function blocksToPages(blocks, breakBefore) {

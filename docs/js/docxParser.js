@@ -1,27 +1,30 @@
 /* docxParser.js
  * Parses a .docx (ArrayBuffer) into an ordered list of "blocks":
- *   { type:'image', dataUrl, mime }
+ *   { type:'image', dataUrl, pageBreakBefore }
  *   { type:'paragraph', runs:[{text,bold,italic,sizePt}], align, pageBreakBefore }
  *   { type:'table', rows:[[cellText,...],...], pageBreakBefore }
  *
  * Also reports:
- *   hasExplicitBreaks - true if the document contains any real Word
- *     page-break markers (Ctrl+Enter or "page break before" paragraph
- *     setting), so the paginator can trust them fully.
+ *   breakSource - where the page boundaries came from:
+ *     'manual'     - the document has real manual page breaks
+ *                    (Ctrl+Enter / "page break before"); authoritative.
+ *     'word-layout'- the document has Word's own <w:lastRenderedPageBreak/>
+ *                    markers, which Word writes at every position where a
+ *                    page broke the last time IT laid the document out.
+ *                    This reproduces Word's pagination exactly, which no
+ *                    amount of re-measuring in a browser can match (the
+ *                    document's real fonts usually aren't available here).
+ *     'none'       - neither; the caller must estimate page boundaries.
  *   pageGeometry - the document's actual page size/margins (from
- *     w:pgSz/w:pgMar, converted from twips to CSS px), so on-screen
- *     rendering and real-layout page-break measurement use the same
- *     page dimensions Word itself would.
+ *     w:pgSz/w:pgMar, converted from twips to CSS px).
+ *
+ * Paragraphs are walked in true document order (text / breaks / images
+ * interleaved as they actually appear) because a page break can fall in
+ * the middle of a paragraph, and because most break-carrying paragraphs
+ * here also anchor an image — so a break must be able to land between
+ * them, not just at paragraph boundaries.
  */
 const DocxParser = (() => {
-  const NS = {
-    w: "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
-  };
-
-  function textOfNode(el) {
-    return el.textContent || "";
-  }
-
   function firstChildTag(el, tag) {
     for (const c of el.childNodes) {
       if (c.nodeType === 1 && c.tagName === tag) return c;
@@ -44,7 +47,7 @@ const DocxParser = (() => {
     return out;
   }
 
-  function runInfo(rEl) {
+  function runFormat(rEl) {
     const rPr = firstChildTag(rEl, "w:rPr");
     let bold = false, italic = false, sizePt = 11;
     if (rPr) {
@@ -58,18 +61,52 @@ const DocxParser = (() => {
         if (!isNaN(v)) sizePt = v / 2;
       }
     }
-    let text = "";
-    let hasPageBreak = false;
-    for (const c of rEl.childNodes) {
-      if (c.nodeType !== 1) continue;
-      if (c.tagName === "w:t") text += c.textContent;
-      else if (c.tagName === "w:tab") text += "\t";
-      else if (c.tagName === "w:br") {
-        if (c.getAttribute("w:type") === "page") hasPageBreak = true;
-        else text += "\n";
+    return { bold, italic, sizePt };
+  }
+
+  const DRAWING_TAGS = new Set(["w:drawing", "mc:AlternateContent", "w:pict", "w:object"]);
+
+  // Flattens a paragraph into an ordered event stream:
+  //   {kind:'text', run}  {kind:'break', manual}  {kind:'image', embedId}
+  function collectParagraphEvents(pEl) {
+    const events = [];
+    for (const rEl of allDescendantTag(pEl, "w:r")) {
+      const fmt = runFormat(rEl);
+      let text = "";
+      const flushText = () => {
+        if (text.length > 0) {
+          events.push({ kind: "text", run: { ...fmt, text } });
+          text = "";
+        }
+      };
+      for (const c of Array.from(rEl.childNodes)) {
+        if (c.nodeType !== 1) continue;
+        const tag = c.tagName;
+        if (tag === "w:t") {
+          text += c.textContent;
+        } else if (tag === "w:tab") {
+          text += "\t";
+        } else if (tag === "w:br") {
+          if (c.getAttribute("w:type") === "page") {
+            flushText();
+            events.push({ kind: "break", manual: true });
+          } else {
+            text += "\n";
+          }
+        } else if (tag === "w:lastRenderedPageBreak") {
+          flushText();
+          events.push({ kind: "break", manual: false });
+        } else if (DRAWING_TAGS.has(tag)) {
+          flushText();
+          for (const blip of allDescendantTag(c, "a:blip")) {
+            const id = blip.getAttribute("r:embed") || blip.getAttribute("r:link");
+            if (id) events.push({ kind: "image", embedId: id });
+          }
+        }
       }
+      flushText();
     }
-    return { text, bold, italic, sizePt, hasPageBreak };
+    return events;
   }
 
   function paragraphPageBreakBefore(pEl) {
@@ -103,20 +140,6 @@ const DocxParser = (() => {
     return { dataUrl, mime };
   }
 
-  async function extractImagesFromParagraph(pEl, zip, rels, mediaCache) {
-    const blips = allDescendantTag(pEl, "a:blip");
-    const out = [];
-    for (const blip of blips) {
-      const embedId = blip.getAttribute("r:embed") || blip.getAttribute("r:link");
-      if (!embedId) continue;
-      const resolved = await resolveImageDataUrl(zip, rels, embedId, mediaCache);
-      if (resolved && resolved.mime !== "image/x-emf" && resolved.mime !== "image/x-wmf") {
-        out.push({ type: "image", dataUrl: resolved.dataUrl });
-      }
-    }
-    return out;
-  }
-
   function tableToBlock(tblEl, pageBreakBefore) {
     const rows = [];
     for (const tr of allDescendantTag(tblEl, "w:tr")) {
@@ -131,9 +154,8 @@ const DocxParser = (() => {
   }
 
   // Word stores page size/margins in twips (1/1440 inch). Convert to CSS px
-  // at 96dpi so the on-screen render and the real-layout page-break
-  // measurement both use the document's actual page geometry instead of an
-  // arbitrary guess.
+  // at 96dpi so rendering uses the document's actual page geometry instead
+  // of an arbitrary guess.
   const TWIP_TO_PX = 96 / 1440;
   const DEFAULT_GEOMETRY = {
     pageWpx: 794,
@@ -184,56 +206,72 @@ const DocxParser = (() => {
     const pageGeometry = extractPageGeometry(doc);
 
     const blocks = [];
-    let hasExplicitBreaks = false;
     const mediaCache = {};
+    let sawManualBreak = false;
+    let sawWordLayoutBreak = false;
+
+    // A break applies to the *next* block emitted, whichever kind it is.
+    let pendingBreak = false;
+    const takeBreak = () => {
+      if (!pendingBreak) return false;
+      pendingBreak = false;
+      return true;
+    };
 
     const children = Array.from(body.childNodes).filter((c) => c.nodeType === 1);
     let done = 0;
-    let pendingBreak = false; // set when a mid-run Ctrl+Enter break was seen; applies to the *next* block
     for (const child of children) {
       done++;
       if (onProgress && done % 5 === 0) onProgress(done, children.length);
 
       if (child.tagName === "w:p") {
-        const explicitBefore = paragraphPageBreakBefore(child);
-        if (explicitBefore) hasExplicitBreaks = true;
-        const effectiveBreak = pendingBreak || explicitBefore;
-        pendingBreak = false;
-        let breakConsumed = false;
-
-        const images = await extractImagesFromParagraph(child, zip, rels, mediaCache);
-        for (const img of images) {
-          blocks.push(!breakConsumed && effectiveBreak ? { ...img, pageBreakBefore: true } : { ...img, pageBreakBefore: false });
-          breakConsumed = true;
+        if (paragraphPageBreakBefore(child)) {
+          sawManualBreak = true;
+          pendingBreak = true;
         }
+        const align = paragraphAlign(child);
 
-        const runs = [];
-        for (const r of allDescendantTag(child, "w:r")) {
-          const info = runInfo(r);
-          if (info.hasPageBreak) {
-            hasExplicitBreaks = true;
-            // everything from here on (this paragraph's remaining runs count
-            // as "after" for our block-granularity purposes) starts a new page
+        let runsAcc = [];
+        const flushParagraph = () => {
+          if (runsAcc.length === 0) return;
+          blocks.push({ type: "paragraph", runs: runsAcc, align, pageBreakBefore: takeBreak() });
+          runsAcc = [];
+        };
+
+        for (const ev of collectParagraphEvents(child)) {
+          if (ev.kind === "text") {
+            if (ev.run.text.trim().length > 0) runsAcc.push(ev.run);
+          } else if (ev.kind === "break") {
+            // text accumulated so far belongs to the page being ended
+            flushParagraph();
+            if (ev.manual) sawManualBreak = true;
+            else sawWordLayoutBreak = true;
             pendingBreak = true;
+          } else if (ev.kind === "image") {
+            flushParagraph();
+            const resolved = await resolveImageDataUrl(zip, rels, ev.embedId, mediaCache);
+            if (resolved && resolved.mime !== "image/x-emf" && resolved.mime !== "image/x-wmf") {
+              blocks.push({ type: "image", dataUrl: resolved.dataUrl, pageBreakBefore: takeBreak() });
+            }
           }
-          if (info.text.trim().length > 0) runs.push(info);
         }
-        if (runs.length > 0) {
-          blocks.push({
-            type: "paragraph",
-            runs,
-            align: paragraphAlign(child),
-            pageBreakBefore: !breakConsumed && effectiveBreak,
-          });
-        }
+        flushParagraph();
       } else if (child.tagName === "w:tbl") {
-        const effectiveBreak = pendingBreak;
-        pendingBreak = false;
-        blocks.push(tableToBlock(child, effectiveBreak));
+        // A table that itself straddles a page boundary carries the break
+        // markers inside its cells. Block-level granularity can't split a
+        // table, so the break is applied after it — an approximation that
+        // keeps the page count right; the user can adjust if needed.
+        const innerBreaks = allDescendantTag(child, "w:lastRenderedPageBreak").length;
+        blocks.push(tableToBlock(child, takeBreak()));
+        if (innerBreaks > 0) {
+          sawWordLayoutBreak = true;
+          pendingBreak = true;
+        }
       }
     }
 
-    return { blocks, hasExplicitBreaks, pageGeometry };
+    const breakSource = sawManualBreak ? "manual" : sawWordLayoutBreak ? "word-layout" : "none";
+    return { blocks, breakSource, pageGeometry };
   }
 
   return { parseDocx };
