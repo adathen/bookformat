@@ -2,9 +2,14 @@
  * Imposes an already-flat, sequential-order PDF (e.g. exported straight
  * from Word/LibreOffice, one book page per PDF page) into the landscape,
  * 2-up, signature-ordered booklet PDF — without any rasterization, by
- * embedding the original vector pages directly. This is higher fidelity
- * and much smaller than the docx path, and needs no page-break guessing
- * since a PDF's pages are already unambiguous.
+ * embedding the original vector pages directly. Needs no page-break
+ * guessing since a PDF's pages are already unambiguous.
+ *
+ * Page size is read from the source PDF itself (pageW/pageH below), not
+ * assumed to be A4 — a sequential A5-per-page PDF (e.g. printed straight
+ * from a docx whose page setup was changed to A5) works the same way:
+ * two A5 pages side by side land almost exactly on an A4 landscape
+ * sheet, which is the standard real-world "A5 booklet on A4 paper" setup.
  *
  * Same imposition formula as the docx path / desktop tool: for N pages
  * padded to a multiple of 4, sheet k (0-indexed):
