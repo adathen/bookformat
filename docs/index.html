@@ -3,31 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>小書轉換器 — docx / PDF 轉小書格式 PDF</title>
+<title>小書轉換器 — PDF 轉小書格式 PDF</title>
 <link rel="stylesheet" href="style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body>
 <header>
   <h1>📖 小書轉換器</h1>
-  <p class="subtitle">上傳排好版的 .docx，或已經排好版的 .pdf（一頁一圖一文），自動輸出可對摺裝訂的小書格式 PDF — 全部在您的瀏覽器內完成，檔案不會上傳到任何伺服器。</p>
+  <p class="subtitle">上傳已排好版的 .pdf（一頁對應書的一頁），自動輸出可對摺裝訂的小書格式 PDF — 全部在您的瀏覽器內完成，檔案不會上傳到任何伺服器。</p>
 </header>
 
 <main>
   <section id="upload-section" class="card">
     <div id="dropzone" class="dropzone">
-      <p>拖曳 .docx 或 .pdf 檔案到這裡，或</p>
+      <p>拖曳 .pdf 檔案到這裡，或</p>
       <label class="btn">
         選擇檔案
-        <input type="file" id="fileInput" accept=".docx,.pdf" hidden>
+        <input type="file" id="fileInput" accept=".pdf" hidden>
       </label>
       <p class="hint-inline">
-        .docx：需要自動判斷分頁位置（可能需手動微調）。<br>
-        .pdf：檔案裡每一頁就是最終書的一頁，不需要判斷分頁，直接排版、品質更高。
+        請先在 Word／LibreOffice 把書的內容另存新檔為 PDF（一頁對應書的一頁），再把那份 PDF 上傳到這裡。
       </p>
       <p id="fileName" class="filename"></p>
     </div>
@@ -41,28 +38,10 @@
     <progress id="progressBar" max="100" value="0"></progress>
   </section>
 
-  <section id="editor-section" class="card" hidden>
-    <div class="editor-header">
-      <h2>確認分頁</h2>
-      <p class="hint">
-        這份文件裡沒有可用的分頁資訊，所以分頁位置是<strong>依實際版面測量推算</strong>的，
-        可能跟原始 Word 不完全一樣，請在下方確認／調整後再產生 PDF。
-        點一下頁面之間的分隔線可以切換「是否分頁」。<br>
-        （一般由 Word 存檔的 docx 都會帶有分頁資訊，會自動採用、不需要這個步驟。）
-      </p>
-      <p class="page-count">目前共 <span id="pageCount">0</span> 頁（會自動補空白頁至 4 的倍數）</p>
-    </div>
-    <div id="blockList" class="block-list"></div>
-    <div class="editor-footer">
-      <button id="generateBtn" class="btn primary">產生小書格式 PDF</button>
-    </div>
-  </section>
-
   <section id="result-section" class="card" hidden>
     <h2>完成！</h2>
     <p id="resultText"></p>
     <a id="downloadLink" class="btn primary" download>下載小書格式 PDF</a>
-    <button id="adjustBtn" class="btn" hidden>手動調整分頁</button>
     <button id="restartBtn" class="btn">重新上傳另一份檔案</button>
   </section>
 
@@ -77,13 +56,6 @@
   <p>印刷建議：雙面列印（長邊翻頁 / flip on long edge）、A4 紙，印完後沿中線對摺、依序疊好，騎馬釘裝訂即完成。</p>
 </footer>
 
-<!-- offscreen render container for html2canvas -->
-<div id="renderStage" aria-hidden="true"></div>
-
-<script src="js/docxParser.js"></script>
-<script src="js/paginate.js"></script>
-<script src="js/renderPage.js"></script>
-<script src="js/pdfBuilder.js"></script>
 <script src="js/pdfImposer.js"></script>
 <script src="js/main.js"></script>
 </body>

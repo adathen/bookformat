@@ -88,59 +88,7 @@ main {
 @keyframes spin { to { transform: rotate(360deg); } }
 progress { width: 100%; margin-top: 14px; height: 8px; }
 
-.editor-header h2 { margin-top: 0; }
-.hint { font-size: 0.88rem; color: var(--text-muted); background: #fbf6e8; border: 1px solid #eadfaf; border-radius: 8px; padding: 12px 14px; }
-.page-count { font-weight: 600; color: var(--accent-dark); }
-
-.block-list { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-
-.block-item {
-  padding: 10px 14px;
-  border-bottom: 1px solid #f0efe9;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-.block-item .thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0; }
-.block-item .snippet { flex: 1; white-space: pre-wrap; word-break: break-word; }
-.block-item.is-image .snippet { font-style: italic; }
-
-.break-gap {
-  height: 14px;
-  position: relative;
-  cursor: pointer;
-  background: #fafaf7;
-}
-.break-gap:hover { background: #eef6f1; }
-.break-gap::after {
-  content: "按此切換分頁";
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
-  font-size: 0.72rem; color: #bbb; white-space: nowrap;
-}
-.break-gap:hover::after { color: var(--accent); }
-.break-gap.is-break {
-  height: 26px;
-  background: repeating-linear-gradient(45deg, #fdeee0, #fdeee0 6px, #fbe3cc 6px, #fbe3cc 12px);
-  border-top: 2px dashed #e08a3c;
-  border-bottom: 2px dashed #e08a3c;
-}
-.break-gap.is-break::after {
-  content: "✂ 此處分頁（第 " attr(data-page) " 頁開始）— 按此取消";
-  color: #b5651d;
-  font-weight: 600;
-}
-
-.editor-footer { text-align: center; margin-top: 20px; }
-
 .error { border-color: #d9534f; }
 .error h2 { color: #b52b27; }
 
 footer { text-align: center; color: var(--text-muted); font-size: 0.82rem; padding: 20px; }
-
-#renderStage {
-  position: fixed;
-  left: -100000px;
-  top: 0;
-}
