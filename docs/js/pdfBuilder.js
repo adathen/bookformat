@@ -1,13 +1,11 @@
-/* pdfBuilder.js
- * 1) Rasterizes each confirmed logical page (via html2canvas) into a PNG.
- * 2) Imposes those PNGs into a landscape, 2-up, signature-ordered PDF
- *    ready for duplex printing + center-fold / saddle-stitch binding.
- *
- * Imposition formula (same as the desktop tool, verified against a
- * hand-made reference booklet): for N pages padded to a multiple of 4,
- * sheet k (0-indexed):
- *   front: [ page(N-2k) | page(2k+1) ]
- *   back : [ page(2k+2) | page(N-2k-1) ]
+/* pdfBuilder.js — docx path, stage 1 of 2
+ * 1) Rasterizes each confirmed logical page (via html2canvas) into a JPEG.
+ * 2) Assembles those JPEGs into a normal flat, sequential-order PDF —
+ *    the same shape as if the docx had been exported straight to PDF
+ *    (one page per book page, in reading order, not yet imposed).
+ * 3) Hands that flat PDF to PdfImposer (js/pdfImposer.js) for the actual
+ *    booklet imposition — the same code path used for direct PDF
+ *    uploads, so there is exactly one imposition implementation.
  */
 const PdfBuilder = (() => {
   function waitForImages(node) {
@@ -31,7 +29,7 @@ const PdfBuilder = (() => {
 
     const results = [];
     for (let i = 0; i < pages.length; i++) {
-      statusCb(`正在繪製第 ${i + 1}/${pages.length} 頁...`, Math.round((i / pages.length) * 60));
+      statusCb(`正在繪製第 ${i + 1}/${pages.length} 頁...`, Math.round((i / pages.length) * 45));
       const node = RenderPage.buildPageNode(pages[i]);
       stage.appendChild(node);
       await waitForImages(node);
@@ -45,62 +43,29 @@ const PdfBuilder = (() => {
     return results;
   }
 
-  async function buildBookletPdfBytes(pageJpegBytesArr, statusCb) {
+  async function buildFlatPdfBytes(pageJpegBytesArr, statusCb) {
     const { PDFDocument } = window.PDFLib;
-    const n = pageJpegBytesArr.length;
-    const pad = (4 - (n % 4)) % 4;
-    const nPad = n + pad;
-
     const pageW = RenderPage.PAGE_W_PT;
     const pageH = RenderPage.PAGE_H_PT;
-    const sheetW = pageW * 2;
-    const sheetH = pageH;
-    const margin = 10;
 
     const pdfDoc = await PDFDocument.create();
-    const embedCache = new Map();
-
-    async function embedded(idx1) {
-      if (idx1 > n) return null;
-      if (embedCache.has(idx1)) return embedCache.get(idx1);
-      const img = await pdfDoc.embedJpg(pageJpegBytesArr[idx1 - 1]);
-      embedCache.set(idx1, img);
-      return img;
+    for (let i = 0; i < pageJpegBytesArr.length; i++) {
+      statusCb(`正在組成原始版面 PDF...（第 ${i + 1}/${pageJpegBytesArr.length} 頁）`, 45 + Math.round((i / pageJpegBytesArr.length) * 15));
+      const img = await pdfDoc.embedJpg(pageJpegBytesArr[i]);
+      const page = pdfDoc.addPage([pageW, pageH]);
+      page.drawImage(img, { x: 0, y: 0, width: pageW, height: pageH });
     }
-
-    async function place(page, slot, idx1) {
-      const img = await embedded(idx1);
-      if (!img) return;
-      const availW = pageW - 2 * margin;
-      const availH = pageH - 2 * margin;
-      const scale = Math.min(availW / img.width, availH / img.height);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      const cx = slot * pageW + pageW / 2;
-      const cy = pageH / 2;
-      page.drawImage(img, { x: cx - w / 2, y: cy - h / 2, width: w, height: h });
-    }
-
-    const sheets = nPad / 4;
-    for (let k = 0; k < sheets; k++) {
-      statusCb(`正在拼版第 ${k + 1}/${sheets} 張...`, 60 + Math.round((k / sheets) * 35));
-      const front = pdfDoc.addPage([sheetW, sheetH]);
-      await place(front, 0, nPad - 2 * k);
-      await place(front, 1, 2 * k + 1);
-
-      const back = pdfDoc.addPage([sheetW, sheetH]);
-      await place(back, 0, 2 * k + 2);
-      await place(back, 1, nPad - 2 * k - 1);
-    }
-
-    statusCb("正在輸出檔案...", 98);
     return await pdfDoc.save();
   }
 
   async function build(pages, statusCb) {
     const pageJpegBytesArr = await renderPagesToJpegBytes(pages, statusCb);
-    const pdfBytes = await buildBookletPdfBytes(pageJpegBytesArr, statusCb);
-    return pdfBytes;
+    const flatPdfBytes = await buildFlatPdfBytes(pageJpegBytesArr, statusCb);
+
+    const { bytes } = await PdfImposer.imposeFlatPdfBytes(flatPdfBytes, (msg, pct) => {
+      statusCb(msg, 60 + Math.round((pct || 0) * 0.4));
+    });
+    return bytes;
   }
 
   return { build };

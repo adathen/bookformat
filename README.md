@@ -35,10 +35,11 @@
 - `js/paginate.js` — 分頁邏輯（有手動分頁點就 100% 依照分頁點；沒有則用
   「每張圖片開新頁＋文字長度」推測）
 - `js/renderPage.js` — 把單頁內容畫成固定尺寸的 HTML 元素
-- `js/pdfBuilder.js` — docx 路徑：用 html2canvas 把每頁轉成圖片，再用 pdf-lib
-  依拼版公式組成小書格式 PDF
-- `js/pdfImposer.js` — pdf 路徑：直接用 pdf-lib 把原始 PDF 頁面（向量內容）
-  嵌入拼版，不經過重新繪製
+- `js/pdfBuilder.js` — docx 路徑第一階段：用 html2canvas 把每頁轉成圖片，組成
+  一份跟原始 docx 頁面順序一樣的「原始版面 PDF」（尚未拼版）
+- `js/pdfImposer.js` — 唯一的拼版邏輯：把一份原始版面 PDF（不論是上面產生
+  的，還是使用者直接上傳的 pdf）依拼版公式嵌入小書格式 PDF。docx 路徑跟
+  pdf 路徑最後都會呼叫這裡，只有這一份拼版程式碼。
 - `js/main.js` — UI 串接（依副檔名分流 docx／pdf、分頁編輯器、產生／下載 PDF）
 
 全部透過 CDN 載入 JSZip / pdf-lib / html2canvas，沒有建置流程，直接是純靜態
