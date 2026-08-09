@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小書轉換器 — docx 轉小書格式 PDF</title>
+<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>📖 小書轉換器</h1>
+  <p class="subtitle">上傳排好版的 .docx（一頁一圖一文），自動輸出可對摺裝訂的小書格式 PDF — 全部在您的瀏覽器內完成，檔案不會上傳到任何伺服器。</p>
+</header>
+
+<main>
+  <section id="upload-section" class="card">
+    <div id="dropzone" class="dropzone">
+      <p>拖曳 .docx 檔案到這裡，或</p>
+      <label class="btn">
+        選擇檔案
+        <input type="file" id="fileInput" accept=".docx" hidden>
+      </label>
+      <p id="fileName" class="filename"></p>
+    </div>
+  </section>
+
+  <section id="status-section" class="card" hidden>
+    <div class="status-row">
+      <div class="spinner" id="spinner"></div>
+      <p id="statusText">處理中...</p>
+    </div>
+    <progress id="progressBar" max="100" value="0"></progress>
+  </section>
+
+  <section id="editor-section" class="card" hidden>
+    <div class="editor-header">
+      <h2>確認分頁</h2>
+      <p class="hint">
+        本工具會自動偵測分頁位置。若原始 docx 沒有手動分頁點，程式會依「每張圖片開新頁」＋「文字長度」推測分頁，
+        <strong>純文字頁面的位置可能跟原始 Word 不完全一樣</strong>，請在下方確認／調整後再產生 PDF。
+        點一下頁面之間的分隔線可以切換「是否分頁」。
+      </p>
+      <p class="page-count">目前共 <span id="pageCount">0</span> 頁（會自動補空白頁至 4 的倍數）</p>
+    </div>
+    <div id="blockList" class="block-list"></div>
+    <div class="editor-footer">
+      <button id="generateBtn" class="btn primary">產生小書格式 PDF</button>
+    </div>
+  </section>
+
+  <section id="result-section" class="card" hidden>
+    <h2>完成！</h2>
+    <p id="resultText"></p>
+    <a id="downloadLink" class="btn primary" download>下載小書格式 PDF</a>
+    <button id="restartBtn" class="btn">重新上傳另一份檔案</button>
+  </section>
+
+  <section id="error-section" class="card error" hidden>
+    <h2>發生問題</h2>
+    <p id="errorText"></p>
+    <button id="errorRestartBtn" class="btn">重新開始</button>
+  </section>
+</main>
+
+<footer>
+  <p>印刷建議：雙面列印（長邊翻頁 / flip on long edge）、A4 紙，印完後沿中線對摺、依序疊好，騎馬釘裝訂即完成。</p>
+</footer>
+
+<!-- offscreen render container for html2canvas -->
+<div id="renderStage" aria-hidden="true"></div>
+
+<script src="js/docxParser.js"></script>
+<script src="js/paginate.js"></script>
+<script src="js/renderPage.js"></script>
+<script src="js/pdfBuilder.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
